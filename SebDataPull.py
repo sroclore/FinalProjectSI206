@@ -1,37 +1,112 @@
+from decimal import Rounded
+from tkinter import Y
 import unittest
 import sqlite3
 import json
 import os
 from bs4 import BeautifulSoup
 import requests
+import re
 
 
 # Name: Sebastian Roclore
 # Who did you work with: Ryley Larson
 
 def getAttendancePrem(year):
-    baseURL = 'https://www.footballwebpages.co.uk/premier-league/attendances/'
-    
+    baseURL = 'https://www.worldfootball.net/attendance/eng-premier-league-'
+    endURL = '/1/'
     try:
         year = str(year)
-        r = requests.get(f'{baseURL}{year}')
+        r = requests.get(baseURL + year + endURL)
         soup = BeautifulSoup(r.text, 'html.parser')
-        rows = soup.find_all('table')
-        print(rows)
+        box = soup.find('div', class_ = 'box')
+        data = box.find_all('td', align = 'right', class_ = 'hell')
+        data2 = box.find_all('td', align = 'right', class_ = 'dunkel')  
     except:
         print('Exception')
 
-    info = []
-    # for row in rows.contents:
-    #     data = row.find_all('td')
-        # print(data)
-        # team = data[1].find('a').text
-        # avgAttendance = data[4].text
-        # totAttendance = data[3].text
-        # info.append((team, avgAttendance, totAttendance))
+    i = 1
+    data1List1 = []
+    for datum in data:
+        if i % 2 == 0:
+            a = str(datum)
+            data1List1.append(a)
+        i += 1
+    data1List2 = []
+    for x in data1List1:
+        data1List2.append(x[31:-5])
+    n = 0
+    for n in range(0, len(data1List1)):
+        data1List2[n] = data1List2[n][:2] + data1List2[n][3:]
+    # print(data1List2)
 
+    i = 1
+    data2List1 = []
+    for datum2 in data2:
+        if i % 2 == 0:
+            a = str(datum2)
+            data2List1.append(a)
+        i += 1
+    data2List2 = []
+    for x in data2List1:
+        data2List2.append(x[33:-5])
+    n = 0
+    for n in range(0, len(data2List2)):
+        p = data2List2[n].split('.') 
+        a = ''.join(p)
+        data2List2[n] = a
+    # print(data2List2)
+
+    info = []
+    item = 0
+    # sorted List of all avg Attendance
+    for item in range(0, len(data1List2)):
+        info.append(int(data1List2[item]))
+        info.append(int(data2List2[item]))
+    info = sorted(info, reverse= True)
+
+    # overall yearly avg Attendance
+    # number = 0
+    # for item in range(0, len(data1List2)):
+    #     number += int(data1List1[item])
+    #     number += int(data1List2[item])
+    # tot = number / (len(data1List1) + len(data1List2))
+    # tot = round(tot, 2)
+    # print(tot)
     return info
 
+def one_year_less(year):
+    a = year.split('-')
+    a[0] = int(a[0])
+    a[0] -= 1
+    a[0] = str(a[0])
+    a[1] = int(a[1])
+    a[1] -= 1
+    a[1] = str(a[1])
+    b = '-'.join(a)
+    return b
+
+
+def ten_years(recent_year):
+    d = {}
+    year = recent_year
+    while len(d.keys()) < 10:
+        d[year] = getAttendancePrem(year)
+        year = one_year_less(year)
+    return d
+        
+def createDatabase(db_name):
+    path = os.path.dirname(os.path.abspath(__file__))
+    conn = sqlite3.connect(path+'/'+db_name)
+    cur = conn.cursor()
+    
+    cur.execute('CREATE TABLE IF NOT EXISTS AttendancePremierLg (year_id INTEGER PRIMARY KEY, season TEXT, avgHomeAttendance INTEGER')
+    conn.commit()
+    return cur, conn
+
+def addData(year, db_name):
+    cur, conn = createDatabase(db_name)
+    data = ten_years(year)
 
 # def get_teams_by_season(season):
 #     url = "https://football-web-pages1.p.rapidapi.com/league-table.json"
@@ -61,43 +136,44 @@ def getAttendancePrem(year):
 
 
 
-def prem_data_grab(season):
-    # L = get_teams_by_season(season)
+# def prem_data_grab(season):
+#     # L = get_teams_by_season(season)
 
-    url = "https://football-web-pages1.p.rapidapi.com/attendances.json"
+#     url = "https://football-web-pages1.p.rapidapi.com/attendances.json"
 
-    headers = {
-        "X-RapidAPI-Host": "football-web-pages1.p.rapidapi.com",
-        "X-RapidAPI-Key": "e34cfc2358mshb0d0a32b739f2e0p1fa103jsnf9f3985beab7"
-    }
+#     headers = {
+#         "X-RapidAPI-Host": "football-web-pages1.p.rapidapi.com",
+#         "X-RapidAPI-Key": "e34cfc2358mshb0d0a32b739f2e0p1fa103jsnf9f3985beab7"
+#     }
 
-    data_dict = {}
+#     data_dict = {}
     
-    for i in range(1, 21):
-        querystring = {"comp":"1","team":{i},"sort":"average","type":"home"}
-        response = requests.request("GET", url, headers=headers, params=querystring)
-        json_data = json.loads(response.text)
-        for x,y in json_data["attendances"].items():
-            if x == 'team':
-                # if y['name'] in L:
-                    team = y['name']
-                    data_dict[team] = []
-            elif x == 'matches':
-                for match in y:
-                    if match["attendance"] != 0:
-                        data_dict[team].append(match["attendance"])
+#     for i in range(1, 21):
+#         querystring = {"comp":"1","team":{i},"sort":"average","type":"home"}
+#         response = requests.request("GET", url, headers=headers, params=querystring)
+#         json_data = json.loads(response.text)
+#         for x,y in json_data["attendances"].items():
+#             if x == 'team':
+#                 # if y['name'] in L:
+#                     team = y['name']
+#                     data_dict[team] = []
+#             elif x == 'matches':
+#                 for match in y:
+#                     if match["attendance"] != 0:
+#                         data_dict[team].append(match["attendance"])
+#     for x,y in data_dict.items():
+#         sum = 0
+#         tot = 0
+#         for num in y:
+#             sum += num
+#             tot += 1
+#         avg = sum / tot
+#         avg = round(avg, 1)
+#         data_dict[x] 
     
-    for x,y in data_dict.items():
-        sum = 0
-        tot = 0
-        for num in y:
-            sum += num
-            tot += 1
-        data_dict[x] = sum / tot
-    
-    print(data_dict)
-    print(len(data_dict))
-    return data_dict
+#     print(data_dict)
+#     print(len(data_dict))
+#     return data_dict
 
 
 
@@ -110,9 +186,11 @@ def prem_data_grab(season):
 
 
 def main():
-    prem_data_grab("2021-2022")
+    # prem_data_grab("2021-2022")
     # print(get_teams_by_season("2013-2014"))
-    print(getAttendancePrem("2021-2022"))
+    # print(getAttendancePrem("2021-2022"))
+    # print(one_year_less("2021-2022"))
+    print(ten_years("2021-2022"))
     return 1
 
 
